@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Evently - Hackathon & Event Management Platform
 
 A modern, full-stack web application for organizing hackathons and tech events with AI-powered team matching.
@@ -459,3 +460,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Live Demo**: [Add your deployed URL]
 - **API Documentation**: `http://your-backend-url.com/docs`
+=======
+# Evently
+Evently — smarter events with AI matchmaking, real-time analytics, and a slick, mobile-first experience.
+>>>>>>> 0b52d285d5fcc50b6d1219037d249d554bfd71e0
