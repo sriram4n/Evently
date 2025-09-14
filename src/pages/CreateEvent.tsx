@@ -1,162 +1,79 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { createEvent } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { Calendar, MapPin, Users, Lightbulb } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import Header from "@/components/Header";
+import { Link } from "react-router-dom";
 
-const CreateEvent = () => {
-  const { toast } = useToast();
-  const [formData, setFormData] = useState({
-    name: "",
-    date: "",
-    description: "",
-    location: "",
-    requiredSkills: "",
-  });
-  const [isLoading, setIsLoading] = useState(false);
+export default function CreateEvent() {
+  const [name, setName] = useState("");
+  const [date, setDate] = useState("");
+  const [location, setLocation] = useState("");
+  const [description, setDescription] = useState("");
+  const [skills, setSkills] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsLoading(true);
-
+    setLoading(true);
     try {
-      // Mock API call - replace with actual backend integration
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast({
-        title: "Event Created!",
-        description: `${formData.name} has been successfully created.`,
-      });
-      
-      setFormData({
-        name: "",
-        date: "",
-        description: "",
-        location: "",
-        requiredSkills: "",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create event. Please try again.",
-        variant: "destructive",
-      });
+      const payload = { name, date, location, description, required_skills: skills };
+      const res = await createEvent(payload);
+      alert("✅ Event created: " + res.event_id);
+      setName(""); setDate(""); setLocation(""); setDescription(""); setSkills("");
+    } catch (err: any) {
+      console.error("createEvent failed:", err);
+      alert("❌ Error creating event");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-4">Create New Event</h1>
-            <p className="text-xl text-muted-foreground">
-              Organize your next hackathon or tech event
-            </p>
-          </div>
-
-          <Card className="shadow-lg border-0 bg-gradient-to-br from-card to-card/50">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Calendar className="w-5 h-5 text-primary" />
-                <span>Event Details</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Event Name</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    placeholder="Awesome Hackathon 2024"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="date">Event Date</Label>
-                    <Input
-                      id="date"
-                      name="date"
-                      type="datetime-local"
-                      value={formData.date}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="location">Location</Label>
-                    <Input
-                      id="location"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleChange}
-                      placeholder="San Francisco, CA"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    placeholder="Describe your event, goals, and what participants can expect..."
-                    rows={4}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="requiredSkills">Required Skills</Label>
-                  <Input
-                    id="requiredSkills"
-                    name="requiredSkills"
-                    value={formData.requiredSkills}
-                    onChange={handleChange}
-                    placeholder="React, Python, UI/UX, Machine Learning (comma-separated)"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    List skills that would be valuable for this event
-                  </p>
-                </div>
-
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={isLoading}
-                  size="lg"
-                >
-                  {isLoading ? "Creating..." : "Create Event"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="max-w-xl mx-auto shadow-md">
+          <CardHeader>
+            <CardTitle>Create Event</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label>Event Name</Label>
+                <Input value={name} onChange={e=>setName(e.target.value)} required placeholder="Hackathon 2025" />
+              </div>
+              <div>
+                <Label>Date</Label>
+                <Input type="date" value={date} onChange={e=>setDate(e.target.value)} required />
+              </div>
+              <div>
+                <Label>Location</Label>
+                <Input value={location} onChange={e=>setLocation(e.target.value)} required placeholder="Hyderabad" />
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Textarea value={description} onChange={e=>setDescription(e.target.value)} required placeholder="Describe the event..." />
+              </div>
+              <div>
+                <Label>Required Skills</Label>
+                <Input value={skills} onChange={e=>setSkills(e.target.value)} placeholder="Python, React" />
+              </div>
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? "Creating..." : "Create Event"}
+              </Button>
+            </form>
+            <div className="mt-4 text-center">
+              <Link to="/">
+                <Button variant="outline">← Back to Home</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
-};
-
-export default CreateEvent;
+}

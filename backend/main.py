@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 import sqlite3
 import json
+import sqlite3
+import time
 from datetime import datetime
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -22,38 +24,70 @@ app.add_middleware(
 )
 
 # Database initialization
-def init_db():
-    conn = sqlite3.connect('evently.db')
-    cursor = conn.cursor()
-    
-    # Events table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            date TEXT NOT NULL,
-            location TEXT NOT NULL,
-            description TEXT NOT NULL,
-            required_skills TEXT NOT NULL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Users table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            skills TEXT NOT NULL,
-            experience TEXT,
-            github TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
+def init_db(retries: int = 5, backoff: float = 0.5):
+    """
+    Initialize DB with WAL mode and create tables.
+    Retries a few times if the DB is locked (useful during dev when multiple processes touch DB).
+    """
+    last_exc = None
+    for attempt in range(1, retries + 1):
+        try:
+            # open connection with timeout
+            conn = sqlite3.connect("evently.db", timeout=30)
+            cursor = conn.cursor()
+
+            # enable WAL mode (helps concurrency) and sane synchronous level
+            try:
+                cursor.execute("PRAGMA journal_mode=WAL;")
+                cursor.execute("PRAGMA synchronous=NORMAL;")
+            except sqlite3.OperationalError:
+                # ignore if WAL can't be set for some reason right now
+                pass
+
+            # Events table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    location TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    required_skills TEXT NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # Users table (with username & password)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    username TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    skills TEXT NOT NULL,
+                    experience TEXT,
+                    github TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            conn.commit()
+            conn.close()
+            return  # success
+        except sqlite3.OperationalError as e:
+            last_exc = e
+            # if locked, wait and retry
+            if "locked" in str(e).lower():
+                wait = backoff * attempt
+                print(f"init_db: database locked, retrying in {wait:.2f}s (attempt {attempt}/{retries})")
+                time.sleep(wait)
+                continue
+            # other operational error — re-raise
+            raise
+    # if we get here, we failed all retries
+    raise last_exc or Exception("init_db failed for unknown reason")
+
 
 # Pydantic models
 class EventCreate(BaseModel):
@@ -66,9 +100,15 @@ class EventCreate(BaseModel):
 class UserCreate(BaseModel):
     name: str
     email: str
+    username: str
+    password: str
     skills: str
     experience: Optional[str] = None
     github: Optional[str] = None
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
 
 class Event(BaseModel):
     id: int
@@ -117,23 +157,43 @@ async def create_event(event: EventCreate):
 @app.post("/register")
 async def register_user(user: UserCreate):
     try:
-        conn = sqlite3.connect('evently.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO users (name, email, skills, experience, github)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (user.name, user.email, user.skills, user.experience, user.github))
-        
-        conn.commit()
-        user_id = cursor.lastrowid
-        conn.close()
-        
+        with sqlite3.connect('evently.db', timeout=30) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO users (name, email, username, password, skills, experience, github)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (user.name, user.email, user.username, user.password, user.skills, user.experience, user.github))
+            user_id = cursor.lastrowid
         return {"message": "User registered successfully", "user_id": user_id}
     except sqlite3.IntegrityError:
-        raise HTTPException(status_code=400, detail="Email already exists")
+        raise HTTPException(status_code=400, detail="Email or username already exists")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/login")
+async def login(user: UserLogin):
+    try:
+        conn = sqlite3.connect('evently.db')
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT * FROM users WHERE username=? AND password=?', (user.username, user.password))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return {
+                "message": "Login successful",
+                "user_id": row[0],
+                "name": row[1],
+                "email": row[2],
+                "username": row[3]
+            }
+        else:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/events", response_model=List[Event])
 async def get_events():
@@ -305,3 +365,4 @@ async def seed_demo_data():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# SQLite database files
+backend/evently.db
+backend/evently.db-shm
+backend/evently.db-wal
+
+# Python virtual environment
+venv/
+*.pyc
+__pycache__/
