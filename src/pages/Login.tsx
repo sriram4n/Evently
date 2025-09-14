@@ -14,20 +14,21 @@ export default function Login() {
   const navigate = useNavigate();
 
   async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await axios.post("http://127.0.0.1:8000/login", { username, password });
-      localStorage.setItem("user", JSON.stringify(res.data));
-      alert("✅ Login successful");
-      navigate("/profile");
-    } catch (err: any) {
-      console.error(err);
-      alert("❌ Invalid credentials");
-    } finally {
-      setLoading(false);
-    }
+  e.preventDefault();
+  setLoading(true);
+  try {
+    const res = await axios.post("http://127.0.0.1:8000/login", { username, password });
+    localStorage.setItem("user", JSON.stringify(res.data));
+    alert("✅ Login successful");
+    navigate("/match");   // 👈 redirect to matching page
+  } catch (err: any) {
+    console.error(err);
+    alert("❌ Invalid credentials");
+  } finally {
+    setLoading(false);
   }
+}
+
 
   return (
     <div className="min-h-screen bg-background">

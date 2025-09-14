@@ -312,55 +312,56 @@ async def match_users(event_id: int):
 @app.post("/seed_demo")
 async def seed_demo_data():
     try:
-        conn = sqlite3.connect('evently.db')
-        cursor = conn.cursor()
-        
-        # Clear existing data
-        cursor.execute('DELETE FROM events')
-        cursor.execute('DELETE FROM users')
-        
-        # Seed events
-        demo_events = [
-            ("AI Hackathon 2024", "2024-01-15T09:00:00", "San Francisco, CA", "Build the next generation of AI applications", "Python,Machine Learning,TensorFlow,React"),
-            ("Web3 Developer Workshop", "2024-01-08T10:00:00", "Austin, TX", "Learn blockchain development", "Solidity,JavaScript,Web3.js,Smart Contracts"),
-            ("Mobile App Challenge", "2023-12-20T09:00:00", "Seattle, WA", "Create innovative mobile applications", "React Native,Flutter,iOS,Android"),
-            ("Sustainability Tech Jam", "2024-02-01T09:00:00", "Portland, OR", "Develop technology solutions for sustainability", "IoT,Data Science,Clean Tech,Python"),
-            ("Fintech Innovation Summit", "2024-01-25T09:00:00", "New York, NY", "Build the future of financial technology", "Node.js,React,APIs,Security")
-        ]
-        
-        for event in demo_events:
-            cursor.execute('''
-                INSERT INTO events (name, date, location, description, required_skills)
-                VALUES (?, ?, ?, ?, ?)
-            ''', event)
-        
-        # Seed users
-        demo_users = [
-            ("Alice Johnson", "alice@example.com", "React,JavaScript,UI/UX Design", "3 years frontend development", "https://github.com/alice"),
-            ("Bob Smith", "bob@example.com", "Python,Machine Learning,Data Science", "5 years ML engineer", "https://github.com/bob"),
-            ("Carol Davis", "carol@example.com", "Node.js,APIs,Backend Development", "4 years backend development", "https://github.com/carol"),
-            ("David Wilson", "david@example.com", "React Native,Mobile Development,iOS", "2 years mobile developer", "https://github.com/david"),
-            ("Eva Brown", "eva@example.com", "Solidity,Web3,Blockchain", "3 years blockchain developer", "https://github.com/eva"),
-            ("Frank Miller", "frank@example.com", "Python,Django,PostgreSQL", "6 years full-stack developer", "https://github.com/frank"),
-            ("Grace Lee", "grace@example.com", "UI/UX Design,Figma,User Research", "4 years UX designer", "https://github.com/grace"),
-            ("Henry Taylor", "henry@example.com", "DevOps,AWS,Docker,Kubernetes", "5 years DevOps engineer", "https://github.com/henry"),
-            ("Ivy Chen", "ivy@example.com", "Data Science,Analytics,Visualization", "3 years data scientist", "https://github.com/ivy"),
-            ("Jack Robinson", "jack@example.com", "Security,Penetration Testing,Cybersecurity", "4 years security specialist", "https://github.com/jack")
-        ]
-        
-        for user in demo_users:
-            cursor.execute('''
-                INSERT INTO users (name, email, skills, experience, github)
-                VALUES (?, ?, ?, ?, ?)
-            ''', user)
-        
-        conn.commit()
-        conn.close()
-        
+        # Use context manager + timeout to avoid DB lock problems
+        with sqlite3.connect('evently.db', timeout=30) as conn:
+            cursor = conn.cursor()
+
+            # Clear existing data
+            cursor.execute('DELETE FROM events')
+            cursor.execute('DELETE FROM users')
+
+            # Seed events
+            demo_events = [
+                ("AI Hackathon 2024", "2024-01-15T09:00:00", "San Francisco, CA", "Build the next generation of AI applications", "Python,Machine Learning,TensorFlow,React"),
+                ("Web3 Developer Workshop", "2024-01-08T10:00:00", "Austin, TX", "Learn blockchain development", "Solidity,JavaScript,Web3.js,Smart Contracts"),
+                ("Mobile App Challenge", "2023-12-20T09:00:00", "Seattle, WA", "Create innovative mobile applications", "React Native,Flutter,iOS,Android"),
+                ("Sustainability Tech Jam", "2024-02-01T09:00:00", "Portland, OR", "Develop technology solutions for sustainability", "IoT,Data Science,Clean Tech,Python"),
+                ("Fintech Innovation Summit", "2024-01-25T09:00:00", "New York, NY", "Build the future of financial technology", "Node.js,React,APIs,Security")
+            ]
+
+            for event in demo_events:
+                cursor.execute('''
+                    INSERT INTO events (name, date, location, description, required_skills)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', event)
+
+            # Seed users (include username & password for the new schema)
+            demo_users = [
+                ("Alice Johnson", "alice@example.com", "alicej", "pass123", "React,JavaScript,UI/UX Design", "3 years frontend development", "https://github.com/alice"),
+                ("Bob Smith", "bob@example.com", "bobsmith", "pass123", "Python,Machine Learning,Data Science", "5 years ML engineer", "https://github.com/bob"),
+                ("Carol Davis", "carol@example.com", "carold", "pass123", "Node.js,APIs,Backend Development", "4 years backend development", "https://github.com/carol"),
+                ("David Wilson", "david@example.com", "davidw", "pass123", "React Native,Mobile Development,iOS", "2 years mobile developer", "https://github.com/david"),
+                ("Eva Brown", "eva@example.com", "evab", "pass123", "Solidity,Web3,Blockchain", "3 years blockchain developer", "https://github.com/eva"),
+                ("Frank Miller", "frank@example.com", "frankm", "pass123", "Python,Django,PostgreSQL", "6 years full-stack developer", "https://github.com/frank"),
+                ("Grace Lee", "grace@example.com", "gracel", "pass123", "UI/UX Design,Figma,User Research", "4 years UX designer", "https://github.com/grace"),
+                ("Henry Taylor", "henry@example.com", "henryt", "pass123", "DevOps,AWS,Docker,Kubernetes", "5 years DevOps engineer", "https://github.com/henry"),
+                ("Ivy Chen", "ivy@example.com", "ivyc", "pass123", "Data Science,Analytics,Visualization", "3 years data scientist", "https://github.com/ivy"),
+                ("Jack Robinson", "jack@example.com", "jackr", "pass123", "Security,Penetration Testing,Cybersecurity", "4 years security specialist", "https://github.com/jack")
+            ]
+
+            for user in demo_users:
+                cursor.execute('''
+                    INSERT INTO users (name, email, username, password, skills, experience, github)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', user)
+
+            # commit happens automatically for "with" if no exceptions
         return {"message": "Demo data seeded successfully", "events": len(demo_events), "users": len(demo_users)}
-        
+
     except Exception as e:
+        # log and return a clear HTTP 500 detail
         raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn
