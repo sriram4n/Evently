@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Calendar, Users, TrendingUp, Zap } from "lucide-react";
 import Header from "@/components/Header";
+import { fetchEvents, fetchUsers, seedDemo } from "@/lib/api";
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -12,24 +13,56 @@ const Dashboard = () => {
     matchingSuccess: 0,
   });
 
-  const [chartData, setChartData] = useState([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  async function loadData() {
+    try {
+      const events = await fetchEvents();
+      const users = await fetchUsers();
+
+      setStats({
+        totalEvents: events.length,
+        totalParticipants: users.length,
+        activeEvents: events.filter((e: any) => new Date(e.date) > new Date()).length,
+        matchingSuccess: Math.floor(Math.random() * 100), // fake % for demo
+      });
+
+      // Simple monthly chart data from events
+      const grouped: Record<string, number> = {};
+      events.forEach((e: any) => {
+        const month = new Date(e.date).toLocaleString("default", { month: "short" });
+        grouped[month] = (grouped[month] || 0) + 1;
+      });
+
+      const data = Object.entries(grouped).map(([month, events]) => ({
+        month,
+        events,
+        participants: Math.floor(Math.random() * 50) + 10, // fake participants for demo
+      }));
+
+      setChartData(data);
+    } catch (err) {
+      console.error("Dashboard load error:", err);
+    }
+  }
+
+  async function handleSeed() {
+    setLoading(true);
+    try {
+      await seedDemo();
+      await loadData();
+      alert("Demo data seeded!");
+    } catch (err) {
+      console.error("Seed error:", err);
+      alert("Error seeding demo data");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    // Mock data - replace with actual API calls
-    setStats({
-      totalEvents: 12,
-      totalParticipants: 248,
-      activeEvents: 3,
-      matchingSuccess: 87,
-    });
-
-    setChartData([
-      { month: "Jan", events: 2, participants: 45 },
-      { month: "Feb", events: 3, participants: 52 },
-      { month: "Mar", events: 1, participants: 28 },
-      { month: "Apr", events: 4, participants: 68 },
-      { month: "May", events: 2, participants: 55 },
-    ]);
+    loadData();
   }, []);
 
   const statCards = [
@@ -67,11 +100,20 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-4">Dashboard</h1>
-          <p className="text-xl text-muted-foreground">
-            Overview of your events and participant analytics
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
+            <p className="text-xl text-muted-foreground">
+              Overview of your events and participant analytics
+            </p>
+          </div>
+          <button
+            onClick={handleSeed}
+            disabled={loading}
+            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+          >
+            {loading ? "Seeding..." : "Seed Demo Data"}
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -106,34 +148,17 @@ const Dashboard = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="month" 
-                    tick={{ fontSize: 12 }}
-                    axisLine={false}
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 12 }}
-                    axisLine={false}
-                  />
-                  <Tooltip 
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} />
+                  <YAxis tick={{ fontSize: 12 }} axisLine={false} />
+                  <Tooltip
                     contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
                     }}
                   />
-                  <Bar 
-                    dataKey="events" 
-                    fill="hsl(var(--primary))" 
-                    name="Events"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar 
-                    dataKey="participants" 
-                    fill="hsl(var(--accent))" 
-                    name="Participants"
-                    radius={[4, 4, 0, 0]}
-                  />
+                  <Bar dataKey="events" fill="hsl(var(--primary))" name="Events" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="participants" fill="hsl(var(--accent))" name="Participants" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -144,34 +169,9 @@ const Dashboard = () => {
               <CardTitle>Recent Activity</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
-                  <div className="w-2 h-2 rounded-full bg-primary"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">New event created</p>
-                    <p className="text-xs text-muted-foreground">AI Hackathon 2024</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">2h ago</span>
-                </div>
-                
-                <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
-                  <div className="w-2 h-2 rounded-full bg-accent"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">15 new registrations</p>
-                    <p className="text-xs text-muted-foreground">Web3 Workshop</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">5h ago</span>
-                </div>
-                
-                <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
-                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Team matching completed</p>
-                    <p className="text-xs text-muted-foreground">Mobile App Challenge</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">1d ago</span>
-                </div>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                This could be wired to a `/recent_activity` endpoint later.
+              </p>
             </CardContent>
           </Card>
         </div>
